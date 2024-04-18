@@ -92,7 +92,7 @@ function addObjects(data: ObjConfig[]) {
 
 async function addObject(objConfig: ObjConfig, position: number[], highRes = false) {
   return loader
-    .loadAsync(highRes ? `/objects/${objConfig.id}/3DModel.glb` : `/objects/${objConfig.id}/3DModel_LowPoly.glb`)
+    .loadAsync(highRes ? `https://cdn.maurice-frank.com/morris-museum/objects/${objConfig.id}/3DModel.glb` : `https://cdn.maurice-frank.com/morris-museum/objects/${objConfig.id}/3DModel_LowPoly.glb`)
     .then((gltf) => {
       const mesh = gltf.scene.children[0].children[0] as THREE.Mesh<
         THREE.BufferGeometry<THREE.NormalBufferAttributes>,
