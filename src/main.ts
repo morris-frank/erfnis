@@ -90,77 +90,115 @@ function addObjects(data: ObjConfig[]) {
   data.forEach((object, index) => addObject(object, V[index]));
 }
 
-async function addObject(objConfig: ObjConfig, position: number[]) {
-  loader.loadAsync(`/objects/${objConfig.id}/3DModel_LowPoly.glb`).then((gltf) => {
-    const mesh = gltf.scene.children[0].children[0] as THREE.Mesh<
-      THREE.BufferGeometry<THREE.NormalBufferAttributes>,
-      THREE.MeshStandardMaterial,
-      THREE.Object3DEventMap
-    >;
+async function addObject(objConfig: ObjConfig, position: number[], highRes = false) {
+  return loader
+    .loadAsync(highRes ? `/objects/${objConfig.id}/3DModel.glb` : `/objects/${objConfig.id}/3DModel_LowPoly.glb`)
+    .then((gltf) => {
+      const mesh = gltf.scene.children[0].children[0] as THREE.Mesh<
+        THREE.BufferGeometry<THREE.NormalBufferAttributes>,
+        THREE.MeshStandardMaterial,
+        THREE.Object3DEventMap
+      >;
 
-    scene.add(mesh);
-    mesh.userData = objConfig;
+      scene.add(mesh);
+      mesh.userData = objConfig;
+      mesh.userData.position = position;
+      mesh.userData.highRes = highRes;
 
-    mesh.position.set(position[0], position[1], 0);
-    mesh.rotation.set(0, 0, 0);
-    const bbox = new THREE.Box3().setFromObject(mesh);
-    const size = new THREE.Vector3();
-    bbox.getSize(size);
-    const max = Math.max(size.x, size.y, size.z);
-    mesh.scale.set((1 / max) * 0.9, (1 / max) * 0.9, (1 / max) * 0.9);
+      mesh.position.set(position[0], position[1], 0);
+      mesh.rotation.set(0, 0, 0);
+      const bbox = new THREE.Box3().setFromObject(mesh);
+      const size = new THREE.Vector3();
+      bbox.getSize(size);
+      const max = Math.max(size.x, size.y, size.z);
+      mesh.scale.set((1 / max) * 0.9, (1 / max) * 0.9, (1 / max) * 0.9);
 
-    mesh.material = mesh.material.clone();
-    mesh.userData.initialEmissive = mesh.material.emissive.clone();
-    mesh.material.emissiveIntensity = 0.5;
+      mesh.material = mesh.material.clone();
+      mesh.userData.initialEmissive = mesh.material.emissive.clone();
+      mesh.material.emissiveIntensity = 0.5;
 
-    mesh.addEventListener("mouseover", (_) => {
-      document.body.style.cursor = "pointer";
+      mesh.addEventListener("mouseover", (_) => {
+        if (!cameraControls.enabled) return;
+        if (selectedObject && selectedObject == mesh) return;
+        document.body.style.cursor = "pointer";
 
-      mesh.userData.materialEmissiveHex = mesh.material.emissive.getHex();
-      mesh.material.emissive.setHex(0xff0000);
-      mesh.material.emissiveIntensity = 0.1;
-    });
+        mesh.userData.materialEmissiveHex = mesh.material.emissive.getHex();
+        mesh.material.emissive.setHex(0xff0000);
+        mesh.material.emissiveIntensity = 0.1;
+      });
 
-    mesh.addEventListener("mouseout", (_) => {
-      document.body.style.cursor = "default";
-      mesh.material.emissive.setHex(mesh.userData.materialEmissiveHex);
-    });
+      mesh.addEventListener("mouseout", (_) => {
+        if (!cameraControls.enabled) return;
+        document.body.style.cursor = "default";
+        mesh.material.emissive.setHex(mesh.userData.materialEmissiveHex);
+      });
+      
+      mesh.addEventListener("mousedown", (_) => {
+        if (selectedObject && selectedObject == mesh) return;
+        selectedObject = mesh;
+        
+        document.body.style.cursor = "default";
+        mesh.material.emissive.setHex(mesh.userData.materialEmissiveHex);
+        cameraControls.enabled = false;
 
-    mesh.addEventListener("mousedown", (_) => {
-      if (selectedObject && selectedObject == mesh) return;
-      selectedObject = mesh;
+        let posZ = 1;
+        let rotX = 0;
+        let rotZ = 0;
 
-      cameraControls.enabled = false;
+        if (camera.position.z < 0) {
+          posZ = -1;
 
-      const rotation = { x: camera.rotation.x, y: camera.rotation.y, z: camera.rotation.z };
-      new TWEEN.Tween(rotation)
-        .to({ x: 0, y: 0, z: 0 }, 1000)
-        .easing(TWEEN.Easing.Quadratic.InOut) // | TWEEN.Easing.Linear.None
+          if (camera.rotation.x < 0) {
+            rotX = -Math.PI;
+          } else {
+            rotX = Math.PI;
+          }
 
-        .onUpdate(() => camera.rotation.set(rotation.x, rotation.y, rotation.z))
-        .start();
+          if (camera.rotation.z < 0) {
+            rotZ = -Math.PI;
+          } else {
+            rotZ = Math.PI;
+          }
+        }
 
-      const coords = { x: camera.position.x, y: camera.position.y };
-      new TWEEN.Tween(coords)
-        .to({ x: position[0], y: position[1] }, 1000)
-        .easing(TWEEN.Easing.Quadratic.InOut) // | TWEEN.Easing.Linear.None
-        .onUpdate(() => camera.position.set(coords.x, coords.y, camera.position.z))
-        .start()
-        .onComplete(() => {
-          cameraControls.target.set(position[0], position[1], 0);
-          cameraControls.enabled = true;
+        const rotation = { x: camera.rotation.x, y: camera.rotation.y, z: camera.rotation.z };
+        new TWEEN.Tween(rotation)
+          .to({ x: rotX, y: 0, z: rotZ }, 1000)
+          .easing(TWEEN.Easing.Quadratic.InOut) // | TWEEN.Easing.Linear.None
+          .onUpdate(() => camera.rotation.set(rotation.x, rotation.y, rotation.z))
+          .start();
 
-          overlay.style.display = "block";
-          overlay.innerHTML = `
+        const coords = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
+        new TWEEN.Tween(coords)
+          .to({ x: position[0], y: position[1], z: posZ }, 1000)
+          .easing(TWEEN.Easing.Quadratic.InOut) // | TWEEN.Easing.Linear.None
+          .onUpdate(() => camera.position.set(coords.x, coords.y, coords.z))
+          .start()
+          .onComplete(() => {
+            cameraControls.target.set(position[0], position[1], 0);
+            cameraControls.enabled = true;
+
+            overlay.style.display = "block";
+            overlay.innerHTML = `
           <img src="${fetchStaticMapboxImage(objConfig.location[0], objConfig.location[1])}" />
             <h1>${objConfig.name}</h1>
             ${objConfig.description}
           `;
-        });
-    });
 
-    interactionManager.add(mesh);
-  });
+            if (!mesh.userData.highRes) {
+              addObject(objConfig, position, true).then((highResMesh) => {
+                highResMesh.rotation.set(mesh.rotation.x, mesh.rotation.y, mesh.rotation.z);
+                scene.remove(mesh);
+                selectedObject = highResMesh;
+              });
+            }
+          });
+      });
+
+      interactionManager.add(mesh);
+
+      return mesh;
+    });
 }
 
 function fetchStaticMapboxImage(lat: number, lon: number) {
