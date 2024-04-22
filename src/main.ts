@@ -52,8 +52,8 @@ function init() {
 
   const cameraControls = new OrbitControls(camera, canvas);
   cameraControls.enablePan = false;
-  cameraControls.enableDamping = true;
-  cameraControls.autoRotate = false;
+  cameraControls.enableDamping = false;
+  cameraControls.rotateSpeed = 0.2;
   cameraControls.update();
 
   window.addEventListener(
