@@ -1,18 +1,21 @@
-// import { setupCounter } from './counter.ts'
+import "@fontsource-variable/eb-garamond";
 import * as TWEEN from "@tweenjs/tween.js";
 import * as THREE from "three";
-import "./style.css";
+import ThreeGlobe from "three-globe";
 import { InteractionManager } from "three.interactive";
-import { GLTFLoader, OrbitControls, RGBELoader } from "three/examples/jsm/Addons.js";
+import { GLTFLoader, OrbitControls, TrackballControls } from "three/examples/jsm/Addons.js";
 import data from "../public/data.json";
-import "@fontsource-variable/eb-garamond";
+import "./style.css";
 
 interface ObjConfig {
-  id: string;
+  path: string;
   name: string;
   location: number[];
+  rotation: number;
   description: string; // in HTML
 }
+
+const BASE_URL = import.meta.env.PROD ? "https://cdn.maurice-frank.com/morris-museum" : "/objects";
 
 function init() {
   const canvas = document.querySelector<HTMLCanvasElement>("#canvas")!;
@@ -23,10 +26,25 @@ function init() {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
 
-  const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 100);
-  camera.position.set(0, 0, 2);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xf2f2f2);
+
+  const globe = new ThreeGlobe()
+    .globeImageUrl("/textures/eo_base_2020_clean_8k.jpg")
+    .showAtmosphere(false)
+    .objectLat("lat")
+    .objectLng("lng")
+    .objectAltitude("alt")
+    .objectThreeObject("mesh")
+    .objectFacesSurface(true);
+  scene.add(globe);
+
+  const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight);
+  const { x, y, z } = globe.getCoords(5.5, 1, 0.5);
+  camera.position.set(x, y, z);
 
   const cameraControls = new OrbitControls(camera, canvas);
+  cameraControls.enablePan = false;
   cameraControls.enableDamping = true;
   cameraControls.autoRotate = false;
   cameraControls.update();
@@ -44,55 +62,19 @@ function init() {
 
   const loadingManager = new THREE.LoadingManager();
 
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf2f2f2);
-
-  const pmremGenerator = new THREE.PMREMGenerator(renderer);
-  pmremGenerator.compileEquirectangularShader();
-
-  const rgbeLoader = new RGBELoader(loadingManager);
-  rgbeLoader.load("/textures/skybox_512px.hdr", (texture) => {
-    let envMap = pmremGenerator.fromEquirectangular(texture).texture;
-    scene.environment = envMap;
-    texture.dispose();
-  });
-
   const loader = new GLTFLoader(loadingManager);
 
   const interactionManager = new InteractionManager(renderer, camera, renderer.domElement);
 
-  return { renderer, scene, camera, cameraControls, loader, interactionManager };
+  scene.add(new THREE.AmbientLight(0xcccccc, Math.PI));
+  scene.add(new THREE.DirectionalLight(0xffffff, 0.6 * Math.PI));
+
+  return { renderer, scene, camera, cameraControls, loader, interactionManager, globe };
 }
 
-function spiralLocations(n: number) {
-  let v = [0, 0];
-  let r = 1;
-  let axis = 0;
-  let delta = 1;
-
-  let V = [];
-  for (let i = 0; i < n; i++) {
-    V.push([v[0], v[1]]);
-
-    v[axis] += delta;
-    if (Math.abs(v[axis]) == r) {
-      axis = axis ? 0 : 1;
-      if (axis) delta = delta < 0 ? 1 : -1;
-      else if (0 < delta) r++;
-    }
-  }
-
-  return V;
-}
-
-function addObjects(data: ObjConfig[]) {
-  const V = spiralLocations(data.length);
-  data.forEach((object, index) => addObject(object, V[index]));
-}
-
-async function addObject(objConfig: ObjConfig, position: number[], highRes = false) {
+async function addObject(objConfig: ObjConfig, highRes = false) {
   return loader
-    .loadAsync(highRes ? `https://cdn.maurice-frank.com/morris-museum/${objConfig.id}/3DModel.glb` : `https://cdn.maurice-frank.com/morris-museum/${objConfig.id}/3DModel_LowPoly.glb`)
+    .loadAsync(highRes ? `${BASE_URL}/${objConfig.path}/3DModel.glb` : `${BASE_URL}/${objConfig.path}/3DModel_LowPoly.glb`)
     .then((gltf) => {
       const mesh = gltf.scene.children[0].children[0] as THREE.Mesh<
         THREE.BufferGeometry<THREE.NormalBufferAttributes>,
@@ -102,19 +84,20 @@ async function addObject(objConfig: ObjConfig, position: number[], highRes = fal
 
       scene.add(mesh);
       mesh.userData = objConfig;
-      mesh.userData.position = position;
       mesh.userData.highRes = highRes;
 
-      mesh.position.set(position[0], position[1], 0);
-      mesh.rotation.set(0, 0, 0);
       const bbox = new THREE.Box3().setFromObject(mesh);
       const size = new THREE.Vector3();
       bbox.getSize(size);
       const max = Math.max(size.x, size.y, size.z);
-      mesh.scale.set((1 / max) * 0.9, (1 / max) * 0.9, (1 / max) * 0.9);
+      mesh.scale.set((1 / max) * 5, (1 / max) * 5, (1 / max) * 5);
+
+      const position = globe.getCoords(objConfig.location[0], objConfig.location[1], highRes ? 0.2 : 0.01);
+      mesh.position.set(position.x, position.y, position.z);
+
+      mesh.rotation.y = (Math.PI / 180) * objConfig.rotation;
 
       mesh.material = mesh.material.clone();
-      mesh.userData.initialEmissive = mesh.material.emissive.clone();
       mesh.material.emissiveIntensity = 0.5;
 
       mesh.addEventListener("mouseover", (_) => {
@@ -132,66 +115,38 @@ async function addObject(objConfig: ObjConfig, position: number[], highRes = fal
         document.body.style.cursor = "default";
         mesh.material.emissive.setHex(mesh.userData.materialEmissiveHex);
       });
-      
+
       mesh.addEventListener("mousedown", (_) => {
         if (selectedObject && selectedObject == mesh) return;
+
+        if (selectedObject) {
+          const [lat, lng] = selectedObject.userData.location as [number, number];
+
+          new TWEEN.Tween(selectedObject.position).to(globe.getCoords(lat, lng, 0.01), 1000).easing(TWEEN.Easing.Quadratic.InOut).start();
+        }
+
         selectedObject = mesh;
-        
+
         document.body.style.cursor = "default";
         mesh.material.emissive.setHex(mesh.userData.materialEmissiveHex);
         cameraControls.enabled = false;
 
-        let posZ = 1;
-        let rotX = 0;
-        let rotZ = 0;
+        const [lat, lng] = mesh.userData.location as [number, number];
 
-        if (camera.position.z < 0) {
-          posZ = -1;
+        new TWEEN.Tween(mesh.position).to(globe.getCoords(lat, lng, 0.2), 1000).easing(TWEEN.Easing.Quadratic.InOut).start();
 
-          if (camera.rotation.x < 0) {
-            rotX = -Math.PI;
-          } else {
-            rotX = Math.PI;
-          }
-
-          if (camera.rotation.z < 0) {
-            rotZ = -Math.PI;
-          } else {
-            rotZ = Math.PI;
-          }
-        }
-
-        const rotation = { x: camera.rotation.x, y: camera.rotation.y, z: camera.rotation.z };
-        new TWEEN.Tween(rotation)
-          .to({ x: rotX, y: 0, z: rotZ }, 1000)
-          .easing(TWEEN.Easing.Quadratic.InOut) // | TWEEN.Easing.Linear.None
-          .onUpdate(() => camera.rotation.set(rotation.x, rotation.y, rotation.z))
-          .start();
-
-        const coords = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
-        new TWEEN.Tween(coords)
-          .to({ x: position[0], y: position[1], z: posZ }, 1000)
-          .easing(TWEEN.Easing.Quadratic.InOut) // | TWEEN.Easing.Linear.None
-          .onUpdate(() => camera.position.set(coords.x, coords.y, coords.z))
+        new TWEEN.Tween(camera.position)
+          .to(globe.getCoords(lat, lng, 0.25), 1000)
+          .easing(TWEEN.Easing.Quadratic.InOut)
           .start()
           .onComplete(() => {
-            cameraControls.target.set(position[0], position[1], 0);
-            cameraControls.enabled = true;
-
+            overlayLoad.style.display = highRes ? "none" : "block";
             overlay.style.display = "block";
-            overlay.innerHTML = `
-          <img src="${fetchStaticMapboxImage(objConfig.location[0], objConfig.location[1])}" />
+            
+            overlayContent.innerHTML = `
+            <img src="${fetchStaticMapboxImage(lat, lng)}" />
             <h1>${objConfig.name}</h1>
-            ${objConfig.description}
-          `;
-
-            if (!mesh.userData.highRes) {
-              addObject(objConfig, position, true).then((highResMesh) => {
-                highResMesh.rotation.set(mesh.rotation.x, mesh.rotation.y, mesh.rotation.z);
-                scene.remove(mesh);
-                selectedObject = highResMesh;
-              });
-            }
+            ${objConfig.description}`;
           });
       });
 
@@ -214,14 +169,9 @@ function fetchStaticMapboxImage(lat: number, lon: number) {
 
 function animate(time: number = 0) {
   requestAnimationFrame(animate);
+  if (selectedObject) selectedObject.rotation.y += 0.01;
 
   cameraControls.update();
-
-  // rotate selected object
-  if (selectedObject) {
-    selectedObject.rotation.y += 0.01;
-  }
-
   interactionManager.update();
   TWEEN.update(time);
   renderer.render(scene, camera);
@@ -229,6 +179,51 @@ function animate(time: number = 0) {
 
 let selectedObject: THREE.Object3D | null = null;
 const overlay = document.querySelector<HTMLDivElement>("#overlay")!;
-const { renderer, scene, camera, cameraControls, loader, interactionManager } = init();
-addObjects(data);
+const overlayContent = document.querySelector<HTMLDivElement>("#overlay-content")!;
+const overlayClose = document.querySelector<HTMLButtonElement>("#overlay-close")!;
+const overlayLoad = document.querySelector<HTMLButtonElement>("#overlay-load")!;
+
+const { renderer, scene, camera, cameraControls, loader, interactionManager, globe } = init();
+
+data.map((objConfig) => addObject(objConfig, false));
+
+overlayClose.onclick = (_) => {
+  if (!selectedObject) return;
+
+  overlay.style.display = "none";
+
+  const [lat, lng] = selectedObject.userData.location as [number, number];
+
+  new TWEEN.Tween(selectedObject.position).to(globe.getCoords(lat, lng, 0.01), 1000).easing(TWEEN.Easing.Quadratic.InOut).start();
+
+  new TWEEN.Tween(selectedObject.rotation)
+    .to(
+      { y: selectedObject.rotation.y - (selectedObject.rotation.y % (2 * Math.PI)) + (Math.PI / 180) * selectedObject.userData.rotation },
+      1000
+    )
+    .easing(TWEEN.Easing.Quadratic.InOut)
+    .start();
+
+  new TWEEN.Tween(camera.position)
+    .to(globe.getCoords(lat, lng, 0.5), 1000)
+    .easing(TWEEN.Easing.Quadratic.InOut)
+    .start()
+    .onComplete(() => {
+      cameraControls.enabled = true;
+      selectedObject = null;
+    });
+};
+
+overlayLoad.onclick = (_) => {
+  if (!selectedObject) return;
+
+  addObject(selectedObject.userData as ObjConfig, true).then((mesh) => {
+    if (!selectedObject) return;
+    mesh.rotation.y = selectedObject.rotation.y;
+    scene.remove(selectedObject);
+    selectedObject = mesh;
+    overlayLoad.style.display = "none";
+  });
+}
+
 animate();
