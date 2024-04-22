@@ -15,6 +15,13 @@ interface ObjConfig {
   description: string; // in HTML
 }
 
+const config = {
+  mesh_scale: 5,
+  base_mesh_altitude: 0.01,
+  zoom_mesh_altitude: 0.2,
+  base_camera_altitude: 0.5,
+};
+
 const BASE_URL = import.meta.env.PROD ? "https://cdn.maurice-frank.com/morris-museum" : "/objects";
 
 function init() {
@@ -40,7 +47,7 @@ function init() {
   scene.add(globe);
 
   const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight);
-  const { x, y, z } = globe.getCoords(5.5, 1, 0.5);
+  const { x, y, z } = globe.getCoords(5.5, 1, config.base_camera_altitude);
   camera.position.set(x, y, z);
 
   const cameraControls = new OrbitControls(camera, canvas);
@@ -90,9 +97,13 @@ async function addObject(objConfig: ObjConfig, highRes = false) {
       const size = new THREE.Vector3();
       bbox.getSize(size);
       const max = Math.max(size.x, size.y, size.z);
-      mesh.scale.set((1 / max) * 5, (1 / max) * 5, (1 / max) * 5);
+      mesh.scale.set(config.mesh_scale / max, config.mesh_scale / max, config.mesh_scale / max);
 
-      const position = globe.getCoords(objConfig.location[0], objConfig.location[1], highRes ? 0.2 : 0.01);
+      const position = globe.getCoords(
+        objConfig.location[0],
+        objConfig.location[1],
+        highRes ? config.zoom_mesh_altitude : config.base_mesh_altitude
+      );
       mesh.position.set(position.x, position.y, position.z);
 
       mesh.rotation.y = (Math.PI / 180) * objConfig.rotation;
@@ -122,21 +133,29 @@ async function addObject(objConfig: ObjConfig, highRes = false) {
         if (selectedObject) {
           const [lat, lng] = selectedObject.userData.location as [number, number];
 
-          new TWEEN.Tween(selectedObject.position).to(globe.getCoords(lat, lng, 0.01), 1000).easing(TWEEN.Easing.Quadratic.InOut).start();
+          new TWEEN.Tween(selectedObject.position)
+            .to(globe.getCoords(lat, lng, config.base_mesh_altitude), 1000)
+            .easing(TWEEN.Easing.Quadratic.InOut)
+            .start();
         }
 
         selectedObject = mesh;
 
+        const isMobile = window.innerWidth < 1000;
         document.body.style.cursor = "default";
         mesh.material.emissive.setHex(mesh.userData.materialEmissiveHex);
         cameraControls.enabled = false;
 
         const [lat, lng] = mesh.userData.location as [number, number];
 
-        new TWEEN.Tween(mesh.position).to(globe.getCoords(lat, lng, 0.2), 1000).easing(TWEEN.Easing.Quadratic.InOut).start();
+        new TWEEN.Tween(mesh.position)
+          .to(globe.getCoords(lat, lng, config.zoom_mesh_altitude), 1000)
+          .easing(TWEEN.Easing.Quadratic.InOut)
+          .start();
 
+        const camera_position = globe.getCoords(lat, lng, isMobile ? 0.27 : 0.24);
         new TWEEN.Tween(camera.position)
-          .to(globe.getCoords(lat, lng, 0.25), 1000)
+          .to({ x: camera_position.x, y: isMobile ? camera_position.y - 2 : camera_position.y, z: camera_position.z }, 1000)
           .easing(TWEEN.Easing.Quadratic.InOut)
           .start()
           .onComplete(() => {
@@ -194,7 +213,10 @@ overlayClose.onclick = (_) => {
 
   const [lat, lng] = selectedObject.userData.location as [number, number];
 
-  new TWEEN.Tween(selectedObject.position).to(globe.getCoords(lat, lng, 0.01), 1000).easing(TWEEN.Easing.Quadratic.InOut).start();
+  new TWEEN.Tween(selectedObject.position)
+    .to(globe.getCoords(lat, lng, config.base_mesh_altitude), 1000)
+    .easing(TWEEN.Easing.Quadratic.InOut)
+    .start();
 
   new TWEEN.Tween(selectedObject.rotation)
     .to(
@@ -205,7 +227,7 @@ overlayClose.onclick = (_) => {
     .start();
 
   new TWEEN.Tween(camera.position)
-    .to(globe.getCoords(lat, lng, 0.5), 1000)
+    .to(globe.getCoords(lat, lng, config.base_camera_altitude), 1000)
     .easing(TWEEN.Easing.Quadratic.InOut)
     .start()
     .onComplete(() => {
