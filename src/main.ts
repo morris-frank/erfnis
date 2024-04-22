@@ -3,7 +3,7 @@ import * as TWEEN from "@tweenjs/tween.js";
 import * as THREE from "three";
 import ThreeGlobe from "three-globe";
 import { InteractionManager } from "three.interactive";
-import { GLTFLoader, OrbitControls, TrackballControls } from "three/examples/jsm/Addons.js";
+import { GLTFLoader, OrbitControls } from "three/examples/jsm/Addons.js";
 import data from "../public/data.json";
 import "./style.css";
 
@@ -142,7 +142,7 @@ async function addObject(objConfig: ObjConfig, highRes = false) {
           .onComplete(() => {
             overlayLoad.style.display = highRes ? "none" : "block";
             overlay.style.display = "block";
-            
+
             overlayContent.innerHTML = `
             <img src="${fetchStaticMapboxImage(lat, lng)}" />
             <h1>${objConfig.name}</h1>
@@ -224,6 +224,6 @@ overlayLoad.onclick = (_) => {
     selectedObject = mesh;
     overlayLoad.style.display = "none";
   });
-}
+};
 
 animate();
