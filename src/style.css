@@ -95,7 +95,7 @@ button {
   display: none;
 }
 
-@media (max-width: 1250px) {
+@media (max-width: 850px) {
   #overlay {
     width: calc(100% - 4em);
     top: unset;

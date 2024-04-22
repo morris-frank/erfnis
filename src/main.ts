@@ -13,10 +13,12 @@ interface ObjConfig {
   location: number[];
   rotation: number;
   description: string; // in HTML
+  height: number; // in cm
 }
 
 const config = {
   mesh_scale: 5,
+  ruler_height: 10, // in cm
   base_mesh_altitude: 0.01,
   zoom_mesh_altitude: 0.2,
   base_camera_altitude: 0.5,
@@ -95,8 +97,9 @@ async function addObject(objConfig: ObjConfig, highRes = false) {
       const bbox = new THREE.Box3().setFromObject(mesh);
       const size = new THREE.Vector3();
       bbox.getSize(size);
-      const max = Math.max(size.x, size.y, size.z);
-      mesh.scale.set(config.mesh_scale / max, config.mesh_scale / max, config.mesh_scale / max);
+      const factor = config.mesh_scale / Math.max(size.x, size.y, size.z);
+      // const scaledSize = size.multiplyScalar(factor);
+      mesh.scale.set(factor, factor, factor);
 
       const position = globe.getCoords(
         objConfig.location[0],
@@ -111,7 +114,6 @@ async function addObject(objConfig: ObjConfig, highRes = false) {
       mesh.material.emissiveIntensity = 0.5;
 
       mesh.addEventListener("mouseover", (_) => {
-        if (!cameraControls.enabled) return;
         if (selectedObject && selectedObject == mesh) return;
         document.body.style.cursor = "pointer";
 
@@ -121,7 +123,6 @@ async function addObject(objConfig: ObjConfig, highRes = false) {
       });
 
       mesh.addEventListener("mouseout", (_) => {
-        if (!cameraControls.enabled) return;
         document.body.style.cursor = "default";
         mesh.material.emissive.setHex(mesh.userData.materialEmissiveHex);
       });
@@ -140,17 +141,16 @@ async function addObject(objConfig: ObjConfig, highRes = false) {
 
         selectedObject = mesh;
 
-        const isMobile = window.innerWidth < 1000;
+        const isMobile = window.innerWidth < 850;
         document.body.style.cursor = "default";
         mesh.material.emissive.setHex(mesh.userData.materialEmissiveHex);
         cameraControls.enabled = false;
+        overlay.style.display = "none";
 
         const [lat, lng] = mesh.userData.location as [number, number];
 
-        new TWEEN.Tween(mesh.position)
-          .to(globe.getCoords(lat, lng, config.zoom_mesh_altitude), 1000)
-          .easing(TWEEN.Easing.Quadratic.InOut)
-          .start();
+        const mesh_position = globe.getCoords(lat, lng, config.zoom_mesh_altitude);
+        new TWEEN.Tween(mesh.position).to(mesh_position, 1000).easing(TWEEN.Easing.Quadratic.InOut).start();
 
         const camera_position = globe.getCoords(lat, lng, isMobile ? 0.27 : 0.24);
         new TWEEN.Tween(camera.position)
