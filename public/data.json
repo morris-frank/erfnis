@@ -1,42 +1,32 @@
 [
   {
     "path": "dan/spoon",
-    "name": "Dan spoon",
     "location": [7.4, -7.55],
     "rotation": 280,
-    "description": "<p>The Wakemia statue is a revered symbol among the <a target='_blank' href=\"https://en.wikipedia.org/wiki/Dan_people\">Dan people</a> of Liberia and Côte d'Ivoire. Used primarily in traditional ceremonies and rituals, this wooden sculpture represents a spiritual connection to ancestral spirits.</p><p>The spoon is bestowed upon the most generous woman in the village as a mark of respect. This particular spoon is unique, being male, which makes it an exceptional and revered outlier among the community's ceremonial spoons.</p>",
     "height": 60
   },
   {
     "path": "bamana/ciwara",
-    "name": "Ciwara Head-piece",
     "location": [13.416667, -6.283333],
     "rotation": 280,
-    "description": "<p>The Bougouni type of the <a target='_blank' href='https://en.wikipedia.org/wiki/Chiwara'>Ciwara mask</a> is a distinctive and revered form among the <a target='_blank' href='https://en.wikipedia.org/wiki/Bambara_people'>Bamana people of Mali</a>. Characterized by its elongated, curved shape and intricate geometric patterns, this mask represents the antelope—a symbol of agriculture and fertility. The Bougouni Chi Wara is often adorned with metal embellishments and features a stylized antelope head with exaggerated horns. Used in agricultural ceremonies, the mask is believed to channel the energy and vitality of the antelope to ensure a successful harvest and promote agricultural abundance. Its unique design and symbolic significance make the Bougouni Chi Wara an essential cultural artifact in Bamana tradition and artistry.</p>",
     "height": 30
   },
   {
     "path": "fante/akuaba",
-    "name": "Akua'ba fertility doll",
     "location": [5.5, -1],
     "rotation": 300,
-    "description": "<p>The <a target='_blank' href=\"https://en.wikipedia.org/wiki/Fante_people\">Fanti people</a>, an ethnic group primarily located in the central and coastal regions of Ghana, use fertility dolls as symbolic and spiritual objects to enhance fertility and ensure safe childbirth. These dolls, often crafted from various materials such as wood, clay, or fabric, are believed to possess spiritual power and represent the ancestral connection to the spirit world.</p><p>In Fante culture, infertility is often seen as a significant issue that can affect a person's social status and family lineage. To address this, women who face challenges in conceiving may seek the assistance of fertility dolls. The dolls are typically cared for and treated with reverence, often placed in special shrines or carried by women as protective amulets.</p><p>During fertility rituals and ceremonies, these dolls play a central role. They are believed to invoke the blessings of ancestral spirits and deities, asking for their intervention in granting the gift of fertility. Additionally, the dolls can be used to educate young girls about the importance of fertility and motherhood in Fante society, passing down cultural beliefs and practices from one generation to the next.</p>",
     "height": 10
   },
   {
     "path": "senufo/figure",
-    "name": "Senufo figure",
     "location": [9.416667, -5.616667],
     "rotation": 75,
-    "description": "<p>The distinctive abstract style of Senufo statues is characterized by simplified and geometric forms, reflecting the artistic sophistication and symbolic depth of Senufo culture. These wooden sculptures often depict human figures with elongated bodies, stylized facial features, and minimalistic details. The emphasis is placed on the essence and spirit of the subject rather than realistic representation. Used in various ceremonies and rituals, Senufo statues serve as spiritual intermediaries, connecting the community with ancestral spirits and the supernatural world. Their unique abstract style not only showcases the artistic mastery of the <a target='_blank' href='https://en.wikipedia.org/wiki/Senufo_people'>Senufo people</a> but also encapsulates their profound spiritual beliefs and cultural heritage.</p>",
     "height": 80
   },
   {
     "path": "bamana/jonyeleni",
-    "name": "Bamana female statue",
     "location": [11.416667, -7.483333],
     "rotation": 120,
-    "description": "<p>Jonyeleni sculptures like this one, distinguished by its prominent breasts and intricate hairstyle, represent the Bamana ideals of feminine beauty and the desirable qualities sought in young women ready for marriage. It is believed that this sculpture was utilized by the Jo association, responsible for ensuring the continuity of life. During Jo performances, such figures are either carried or positioned behind the performers to captivate the audience. They are embellished with loincloths, jewelry, and head wraps, often borrowed from the village's young women. This particular figure still features traces of red thread decorations in both ears, with two cowrie shells hanging from the right earlobe.</p>",
     "height": 45
   }
 ]

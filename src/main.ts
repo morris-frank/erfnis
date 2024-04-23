@@ -1,4 +1,3 @@
-import "@fontsource-variable/eb-garamond";
 import * as TWEEN from "@tweenjs/tween.js";
 import * as THREE from "three";
 import ThreeGlobe from "three-globe";
@@ -9,10 +8,8 @@ import "./style.css";
 
 interface ObjConfig {
   path: string;
-  name: string;
   location: number[];
   rotation: number;
-  description: string; // in HTML
   height: number; // in cm
 }
 
@@ -80,7 +77,26 @@ function init() {
   return { renderer, scene, camera, cameraControls, loader, interactionManager, globe };
 }
 
+function unZoomMesh(mesh: THREE.Object3D<THREE.Object3DEventMap>) {
+  const [lat, lng] = mesh.userData.location as [number, number];
+
+  new TWEEN.Tween(mesh.position)
+    .to(globe.getCoords(lat, lng, config.base_mesh_altitude), 1000)
+    .easing(TWEEN.Easing.Quadratic.InOut)
+    .start();
+
+  new TWEEN.Tween(mesh.rotation)
+    .to({ y: mesh.rotation.y - (mesh.rotation.y % (2 * Math.PI)) + (Math.PI / 180) * mesh.userData.rotation }, 1000)
+    .easing(TWEEN.Easing.Quadratic.InOut)
+    .start();
+}
+
 async function addObject(objConfig: ObjConfig, highRes = false) {
+  fetch(`${BASE_URL}/${objConfig.path}/description.html`).then((response) => {
+    response.text().then((text) => {
+      descriptions[objConfig.path] = text;
+    });
+  });
   return loader
     .loadAsync(highRes ? `${BASE_URL}/${objConfig.path}/3DModel.glb` : `${BASE_URL}/${objConfig.path}/3DModel_LowPoly.glb`)
     .then((gltf) => {
@@ -112,12 +128,11 @@ async function addObject(objConfig: ObjConfig, highRes = false) {
 
       mesh.material = mesh.material.clone();
       mesh.material.emissiveIntensity = 0.5;
+      mesh.userData.materialEmissiveHex = mesh.material.emissive.getHex();
 
       mesh.addEventListener("mouseover", (_) => {
         if (selectedObject && selectedObject == mesh) return;
         document.body.style.cursor = "pointer";
-
-        mesh.userData.materialEmissiveHex = mesh.material.emissive.getHex();
         mesh.material.emissive.setHex(0xff0000);
         mesh.material.emissiveIntensity = 0.1;
       });
@@ -129,15 +144,7 @@ async function addObject(objConfig: ObjConfig, highRes = false) {
 
       mesh.addEventListener("mousedown", (_) => {
         if (selectedObject && selectedObject == mesh) return;
-
-        if (selectedObject) {
-          const [lat, lng] = selectedObject.userData.location as [number, number];
-
-          new TWEEN.Tween(selectedObject.position)
-            .to(globe.getCoords(lat, lng, config.base_mesh_altitude), 1000)
-            .easing(TWEEN.Easing.Quadratic.InOut)
-            .start();
-        }
+        if (selectedObject) unZoomMesh(selectedObject);
 
         selectedObject = mesh;
 
@@ -163,8 +170,8 @@ async function addObject(objConfig: ObjConfig, highRes = false) {
 
             overlayContent.innerHTML = `
             <img src="${fetchStaticMapboxImage(lat, lng)}" />
-            <h1>${objConfig.name}</h1>
-            ${objConfig.description}`;
+            ${descriptions[objConfig.path]}
+            `;
           });
       });
 
@@ -196,6 +203,7 @@ function animate(time: number = 0) {
 }
 
 let selectedObject: THREE.Object3D | null = null;
+let descriptions: { [key: string]: string } = {};
 const overlay = document.querySelector<HTMLDivElement>("#overlay")!;
 const overlayContent = document.querySelector<HTMLDivElement>("#overlay-content")!;
 const overlayClose = document.querySelector<HTMLButtonElement>("#overlay-close")!;
@@ -209,22 +217,9 @@ overlayClose.onclick = (_) => {
   if (!selectedObject) return;
 
   overlay.style.display = "none";
+  unZoomMesh(selectedObject);
 
   const [lat, lng] = selectedObject.userData.location as [number, number];
-
-  new TWEEN.Tween(selectedObject.position)
-    .to(globe.getCoords(lat, lng, config.base_mesh_altitude), 1000)
-    .easing(TWEEN.Easing.Quadratic.InOut)
-    .start();
-
-  new TWEEN.Tween(selectedObject.rotation)
-    .to(
-      { y: selectedObject.rotation.y - (selectedObject.rotation.y % (2 * Math.PI)) + (Math.PI / 180) * selectedObject.userData.rotation },
-      1000
-    )
-    .easing(TWEEN.Easing.Quadratic.InOut)
-    .start();
-
   new TWEEN.Tween(camera.position)
     .to(globe.getCoords(lat, lng, config.base_camera_altitude), 1000)
     .easing(TWEEN.Easing.Quadratic.InOut)
