@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "process": "scripts/process_models.sh"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "^3.10.1",
     "@types/three": "^0.163.0",
     "typescript": "^5.2.2",
     "vite": "^5.2.0"

@@ -11,6 +11,7 @@ interface ObjConfig {
   location: number[];
   rotation: number;
   height: number; // in cm
+  polycam: boolean;
 }
 
 const config = {
@@ -52,6 +53,8 @@ function init() {
   const cameraControls = new OrbitControls(camera, canvas);
   cameraControls.enablePan = false;
   cameraControls.rotateSpeed = 0.2;
+  cameraControls.maxDistance = 155;
+  cameraControls.minDistance = 105;
   cameraControls.update();
 
   window.addEventListener(
@@ -97,88 +100,99 @@ async function addObject(objConfig: ObjConfig, highRes = false) {
       descriptions[objConfig.path] = text;
     });
   });
-  return loader
-    .loadAsync(highRes ? `${BASE_URL}/${objConfig.path}/3DModel.glb` : `${BASE_URL}/${objConfig.path}/3DModel_LowPoly.glb`)
-    .then((gltf) => {
-      const mesh = gltf.scene.children[0].children[0] as THREE.Mesh<
-        THREE.BufferGeometry<THREE.NormalBufferAttributes>,
-        THREE.MeshStandardMaterial,
-        THREE.Object3DEventMap
-      >;
 
-      scene.add(mesh);
-      mesh.userData = objConfig;
-      mesh.userData.highRes = highRes;
+  const path = `${BASE_URL}/${objConfig.path}/${objConfig.polycam ? "" : "3DModel"}${highRes ? "highRes" : "lowRes"}.glb`;
 
-      const bbox = new THREE.Box3().setFromObject(mesh);
-      const size = new THREE.Vector3();
-      bbox.getSize(size);
-      const factor = config.mesh_scale / Math.max(size.x, size.y, size.z);
-      // const scaledSize = size.multiplyScalar(factor);
-      mesh.scale.set(factor, factor, factor);
+  return loader.loadAsync(path).then((gltf) => {
+    const mesh = (objConfig.polycam ? gltf.scene.children[0] : gltf.scene.children[0].children[0]) as THREE.Mesh<
+      THREE.BufferGeometry<THREE.NormalBufferAttributes>,
+      THREE.MeshStandardMaterial,
+      THREE.Object3DEventMap
+    >;
 
-      const position = globe.getCoords(
-        objConfig.location[0],
-        objConfig.location[1],
-        highRes ? config.zoom_mesh_altitude : config.base_mesh_altitude
-      );
-      mesh.position.set(position.x, position.y, position.z);
+    scene.add(mesh);
+    mesh.userData = objConfig;
+    mesh.userData.highRes = highRes;
 
-      mesh.rotation.y = (Math.PI / 180) * objConfig.rotation;
+    mesh.material = mesh.material.clone();
+    mesh.material.emissiveIntensity = 0.5;
+    mesh.userData.materialEmissiveHex = mesh.material.emissive.getHex();
 
-      mesh.material = mesh.material.clone();
-      mesh.material.emissiveIntensity = 0.5;
-      mesh.userData.materialEmissiveHex = mesh.material.emissive.getHex();
+    const bbox = new THREE.Box3().setFromObject(mesh);
 
-      mesh.addEventListener("mouseover", (_) => {
-        if (selectedObject && selectedObject == mesh) return;
-        document.body.style.cursor = "pointer";
-        mesh.material.emissive.setHex(0xff0000);
-        mesh.material.emissiveIntensity = 0.1;
-      });
+    const size = new THREE.Vector3();
+    bbox.getSize(size);
+    const factor = config.mesh_scale / Math.max(size.x, size.y, size.z);
+    // const scaledSize = size.multiplyScalar(factor);
+    mesh.scale.set(factor, factor, factor);
 
-      mesh.addEventListener("mouseout", (_) => {
-        document.body.style.cursor = "default";
-        mesh.material.emissive.setHex(mesh.userData.materialEmissiveHex);
-      });
+    const position = globe.getCoords(
+      objConfig.location[0],
+      objConfig.location[1],
+      highRes ? config.zoom_mesh_altitude : config.base_mesh_altitude
+    );
+    mesh.position.set(position.x, position.y, position.z);
 
-      mesh.addEventListener("mousedown", (_) => {
-        if (selectedObject && selectedObject == mesh) return;
-        if (selectedObject) unZoomMesh(selectedObject);
+    mesh.rotation.y = (Math.PI / 180) * objConfig.rotation;
 
-        selectedObject = mesh;
+    if (import.meta.env.DEV) {
+      const box = new THREE.BoxHelper(mesh, 0xffff00);
+      box.update();
+      scene.add(box);
 
-        const isMobile = window.innerWidth < 850;
-        document.body.style.cursor = "default";
-        mesh.material.emissive.setHex(mesh.userData.materialEmissiveHex);
-        cameraControls.enabled = false;
-        overlay.style.display = "none";
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+      mesh.add(dot);
+    }
 
-        const [lat, lng] = mesh.userData.location as [number, number];
+    mesh.addEventListener("mouseover", (_) => {
+      if (selectedObject && selectedObject == mesh) return;
+      document.body.style.cursor = "pointer";
+      mesh.material.emissive.setHex(0xff0000);
+      mesh.material.emissiveIntensity = 0.1;
+    });
 
-        const mesh_position = globe.getCoords(lat, lng, config.zoom_mesh_altitude);
-        new TWEEN.Tween(mesh.position).to(mesh_position, 1000).easing(TWEEN.Easing.Quadratic.InOut).start();
+    mesh.addEventListener("mouseout", (_) => {
+      document.body.style.cursor = "default";
+      mesh.material.emissive.setHex(mesh.userData.materialEmissiveHex);
+    });
 
-        const camera_position = globe.getCoords(lat, lng, isMobile ? 0.27 : 0.24);
-        new TWEEN.Tween(camera.position)
-          .to({ x: camera_position.x, y: isMobile ? camera_position.y - 2 : camera_position.y, z: camera_position.z }, 1000)
-          .easing(TWEEN.Easing.Quadratic.InOut)
-          .start()
-          .onComplete(() => {
-            overlayLoad.style.display = highRes ? "none" : "block";
-            overlay.style.display = "block";
+    mesh.addEventListener("mousedown", (_) => {
+      if (selectedObject && selectedObject == mesh) return;
+      if (selectedObject) unZoomMesh(selectedObject);
 
-            overlayContent.innerHTML = `
+      selectedObject = mesh;
+
+      const isMobile = window.innerWidth < 850;
+      document.body.style.cursor = "default";
+      mesh.material.emissive.setHex(mesh.userData.materialEmissiveHex);
+      cameraControls.enabled = false;
+      overlay.style.display = "none";
+
+      const [lat, lng] = mesh.userData.location as [number, number];
+
+      const mesh_position = globe.getCoords(lat, lng, config.zoom_mesh_altitude);
+      new TWEEN.Tween(mesh.position).to(mesh_position, 1000).easing(TWEEN.Easing.Quadratic.InOut).start();
+
+      const camera_position = globe.getCoords(lat, lng, isMobile ? 0.27 : 0.23);
+      new TWEEN.Tween(camera.position)
+        .to({ x: camera_position.x, y: isMobile ? camera_position.y - 2 : camera_position.y, z: camera_position.z }, 1000)
+        .easing(TWEEN.Easing.Quadratic.InOut)
+        .start()
+        .onComplete(() => {
+          overlayLoad.style.display = highRes ? "none" : "block";
+          overlay.style.display = "block";
+
+          overlayContent.innerHTML = `
             <img src="${fetchStaticMapboxImage(lat, lng)}" />
             ${descriptions[objConfig.path]}
             `;
-          });
-      });
-
-      interactionManager.add(mesh);
-
-      return mesh;
+        });
     });
+
+    interactionManager.add(mesh);
+
+    return mesh;
+  });
 }
 
 function fetchStaticMapboxImage(lat: number, lon: number) {

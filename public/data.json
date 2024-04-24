@@ -2,31 +2,36 @@
   {
     "path": "dan/spoon",
     "location": [7.4, -7.55],
-    "rotation": 280,
-    "height": 60
+    "rotation": 90,
+    "height": 60,
+    "polycam": true
   },
   {
     "path": "bamana/ciwara",
     "location": [13.416667, -6.283333],
     "rotation": 280,
-    "height": 30
+    "height": 30,
+    "polycam": false
   },
   {
     "path": "fante/akuaba",
     "location": [5.5, -1],
     "rotation": 300,
-    "height": 10
+    "height": 10,
+    "polycam": false
   },
   {
     "path": "senufo/figure",
     "location": [9.416667, -5.616667],
     "rotation": 75,
-    "height": 80
+    "height": 80,
+    "polycam": false
   },
   {
     "path": "bamana/jonyeleni",
     "location": [11.416667, -7.483333],
     "rotation": 120,
-    "height": 45
+    "height": 45,
+    "polycam": false
   }
 ]
