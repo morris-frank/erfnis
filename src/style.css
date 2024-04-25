@@ -29,6 +29,12 @@ body {
   overflow: hidden;
 }
 
+h1 {
+  font-size: 1.8rem;
+  text-align: center;
+  font-style: italic;
+  font-weight: 400;
+}
 
 
 a {
@@ -67,6 +73,21 @@ button {
 #canvas {
   position: relative;
   height: 100vh;
+}
+
+#entrance {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgb(242 238 232 / 93%);
+  backdrop-filter: blur(10px);
+  z-index: 100;
+  flex-direction: column;
 }
 
 #overlay {
@@ -117,12 +138,7 @@ button {
 
 
 #overlay-content {
-  h1 {
-    font-size: 1.8rem;
-    text-align: center;
-    font-style: italic;
-    font-weight: 400;
-  }
+
   
   table {
     font-size: 0.9rem;
