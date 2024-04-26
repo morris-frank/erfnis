@@ -1,0 +1,33 @@
+[
+  {
+    "path": "dan/spoon",
+    "models": ["1", "2"],
+    "location": [7.4, -7.55],
+    "rotation": 90,
+    "polycam": true
+  },
+  {
+    "path": "bamana/ciwara",
+    "location": [13.416667, -6.283333],
+    "rotation": 280,
+    "polycam": false
+  },
+  {
+    "path": "fante/akuaba",
+    "location": [5.5, -1],
+    "rotation": 300,
+    "polycam": false
+  },
+  {
+    "path": "senufo/figure",
+    "location": [9.416667, -5.616667],
+    "rotation": 75,
+    "polycam": false
+  },
+  {
+    "path": "bamana/jonyeleni",
+    "location": [11.416667, -7.483333],
+    "rotation": 120,
+    "polycam": false
+  }
+]

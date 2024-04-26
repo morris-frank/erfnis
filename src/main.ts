@@ -8,9 +8,9 @@ import "./style.css";
 
 interface ObjConfig {
   path: string;
+  models: number;
   location: number[];
   rotation: number;
-  height: number; // in cm
   polycam: boolean;
 }
 
@@ -97,12 +97,13 @@ const overlay = document.querySelector<HTMLDivElement>("#overlay")!;
 const overlayContent = document.querySelector<HTMLDivElement>("#overlay-content")!;
 const overlayClose = document.querySelector<HTMLButtonElement>("#overlay-close")!;
 const overlayLoad = document.querySelector<HTMLButtonElement>("#overlay-load")!;
+const overlayNext = document.querySelector<HTMLButtonElement>("#overlay-next")!;
 const start = document.querySelector<HTMLButtonElement>("#start")!;
 const entrance = document.querySelector<HTMLDivElement>("#entrance")!;
 
 start.onclick = (_) => {
   const { renderer, scene, camera, cameraControls, loader, interactionManager, globe } = init();
-  data.map((objConfig) => addObject(objConfig, false));
+  data.map((objConfig) => addObject(objConfig, false, 0, false));
   animate();
   entrance.style.display = "none";
 
@@ -120,14 +121,14 @@ start.onclick = (_) => {
       .start();
   }
 
-  async function addObject(objConfig: ObjConfig, highRes = false) {
+  async function addObject(objConfig: ObjConfig, highRes: boolean = false, model: number = 0, zoomed: boolean = false) {
     fetch(`${BASE_URL}/${objConfig.path}/description.html`).then((response) => {
       response.text().then((text) => {
         descriptions[objConfig.path] = text;
       });
     });
 
-    const path = `${BASE_URL}/${objConfig.path}/${objConfig.polycam ? "" : "3DModel"}${highRes ? "highRes" : "lowRes"}.glb`;
+    const path = `${BASE_URL}/${objConfig.path}/models/${model}/${objConfig.polycam ? "" : "3DModel"}${highRes ? "highRes" : "lowRes"}.glb`;
 
     return loader.loadAsync(path).then((gltf) => {
       const mesh = (objConfig.polycam ? gltf.scene.children[0] : gltf.scene.children[0].children[0]) as THREE.Mesh<
@@ -139,23 +140,21 @@ start.onclick = (_) => {
       scene.add(mesh);
       mesh.userData = objConfig;
       mesh.userData.highRes = highRes;
+      mesh.userData.model = model;
 
       mesh.material = mesh.material.clone();
       mesh.material.emissiveIntensity = 0.5;
       mesh.userData.materialEmissiveHex = mesh.material.emissive.getHex();
 
       const bbox = new THREE.Box3().setFromObject(mesh);
-
       const size = new THREE.Vector3();
       bbox.getSize(size);
-      const factor = config.mesh_scale / Math.max(size.x, size.y, size.z);
-      // const scaledSize = size.multiplyScalar(factor);
-      mesh.scale.set(factor, factor, factor);
+      mesh.scale.setScalar((config.mesh_scale * mesh.scale.y) / size.y);
 
       const position = globe.getCoords(
         objConfig.location[0],
         objConfig.location[1],
-        highRes ? config.zoom_mesh_altitude : config.base_mesh_altitude
+        zoomed ? config.zoom_mesh_altitude : config.base_mesh_altitude
       );
       mesh.position.set(position.x, position.y, position.z);
 
@@ -199,13 +198,14 @@ start.onclick = (_) => {
         const mesh_position = globe.getCoords(lat, lng, config.zoom_mesh_altitude);
         new TWEEN.Tween(mesh.position).to(mesh_position, 1000).easing(TWEEN.Easing.Quadratic.InOut).start();
 
-        const camera_position = globe.getCoords(lat, lng, isMobile ? 0.27 : 0.23);
+        const camera_position = globe.getCoords(lat, lng, isMobile ? 0.27 : 0.237);
         new TWEEN.Tween(camera.position)
           .to({ x: camera_position.x, y: isMobile ? camera_position.y - 2 : camera_position.y, z: camera_position.z }, 1000)
           .easing(TWEEN.Easing.Quadratic.InOut)
           .start()
           .onComplete(() => {
             overlayLoad.style.display = highRes ? "none" : "block";
+            overlayNext.style.display = objConfig.models > 1 ? "block" : "none";
             overlay.style.display = "block";
 
             overlayContent.innerHTML = `
@@ -251,12 +251,25 @@ start.onclick = (_) => {
   overlayLoad.onclick = (_) => {
     if (!selectedObject) return;
 
-    addObject(selectedObject.userData as ObjConfig, true).then((mesh) => {
+    addObject(selectedObject.userData as ObjConfig, true, selectedObject.userData.model, true).then((mesh) => {
       if (!selectedObject) return;
       mesh.rotation.y = selectedObject.rotation.y;
       scene.remove(selectedObject);
       selectedObject = mesh;
       overlayLoad.style.display = "none";
+    });
+  };
+
+  overlayNext.onclick = (_) => {
+    if (!selectedObject) return;
+
+    const nextModel = (selectedObject.userData.model + 1) % selectedObject.userData.models;
+
+    addObject(selectedObject.userData as ObjConfig, selectedObject.userData.highRes, nextModel, true).then((mesh) => {
+      if (!selectedObject) return;
+      mesh.rotation.y = selectedObject.rotation.y;
+      scene.remove(selectedObject);
+      selectedObject = mesh;
     });
   };
 };
