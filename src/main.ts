@@ -8,9 +8,7 @@ import "./style.css";
 
 interface ObjConfig {
   id: string;
-  models: number;
   location: number[];
-  rotation: number;
 }
 
 const config = {
@@ -96,18 +94,17 @@ let selectedObject: THREE.Mesh<
   THREE.MeshStandardMaterial,
   THREE.Object3DEventMap
 > | null = null;
-let descriptions: { [key: string]: string } = {};
 const overlay = document.querySelector<HTMLDivElement>("#overlay")!;
 const overlayContent = document.querySelector<HTMLDivElement>("#overlay-content")!;
+const overlayImages = document.querySelector<HTMLDivElement>("#overlay-images")!;
 const overlayClose = document.querySelector<HTMLButtonElement>("#overlay-close")!;
 const overlayLoad = document.querySelector<HTMLButtonElement>("#overlay-load")!;
-const overlayNext = document.querySelector<HTMLButtonElement>("#overlay-next")!;
 const start = document.querySelector<HTMLButtonElement>("#start")!;
 const entrance = document.querySelector<HTMLDivElement>("#entrance")!;
 
 start.onclick = (_) => {
   const { renderer, scene, camera, cameraControls, loader, interactionManager, globe } = init();
-  data.map((objConfig) => addObject(objConfig, 0, false));
+  data.map((objConfig) => addObject(objConfig));
   animate();
   entrance.style.display = "none";
 
@@ -120,7 +117,7 @@ start.onclick = (_) => {
       .start();
 
     new TWEEN.Tween(mesh.rotation)
-      .to({ y: mesh.rotation.y - (mesh.rotation.y % (2 * Math.PI)) + (Math.PI / 180) * mesh.userData.rotation }, 1000)
+      .to({ y: mesh.rotation.y - (mesh.rotation.y % (2 * Math.PI)) + (Math.PI / 180) * -45 }, 1000)
       .easing(TWEEN.Easing.Quadratic.InOut)
       .start();
   }
@@ -144,13 +141,7 @@ start.onclick = (_) => {
     });
   }
 
-  async function addObject(objConfig: ObjConfig, model: number = 0, zoomed: boolean = false) {
-    // fetch(`${BASE_URL}/${objConfig.id}/description.html`).then((response) => {
-    //   response.text().then((text) => {
-    //     descriptions[objConfig.id] = text;
-    //   });
-    // });
-
+  async function addObject(objConfig: ObjConfig, zoomed: boolean = false) {
     return loader.loadAsync(`${BASE_URL}/${objConfig.id}/lowRes.glb`).then((gltf) => {
       const mesh = gltf.scene.children[0] as THREE.Mesh<
         THREE.BufferGeometry<THREE.NormalBufferAttributes>,
@@ -160,7 +151,6 @@ start.onclick = (_) => {
 
       scene.add(mesh);
       mesh.userData = objConfig;
-      mesh.userData.model = model;
       mesh.userData.highRes = false;
       mesh.userData.path = `${BASE_URL}/${objConfig.id}`;
 
@@ -180,7 +170,7 @@ start.onclick = (_) => {
       );
       mesh.position.set(position.x, position.y, position.z);
 
-      mesh.rotation.y = (Math.PI / 180) * objConfig.rotation;
+      mesh.rotation.y = (Math.PI / 180) * -45;
 
       mesh.addEventListener("mouseover", (_) => {
         if (selectedObject && selectedObject == mesh) return;
@@ -195,23 +185,36 @@ start.onclick = (_) => {
       });
 
       mesh.addEventListener("mousedown", (_) => {
-        console.log(mesh.id, selectedObject?.id);
         if (selectedObject && selectedObject == mesh) return;
         if (selectedObject) unZoomMesh(selectedObject);
-
         selectedObject = mesh;
+
+        fetch(`${BASE_URL}/${objConfig.id}/description.html`).then((response) => {
+          if (response.ok) {
+            response.text().then((text) => {
+              overlayContent.innerHTML += text;
+            });
+          }
+        }, (_) => { });
+
+        fetch(`${BASE_URL}/${objConfig.id}/images.json`).then((response) => {
+          response.json().then((images) => {
+            overlayImages.innerHTML = images.map((image: string) => `<img src="${BASE_URL}/${objConfig.id}/${image}" />`).join("");
+          });
+        });
 
         const isMobile = window.innerWidth < 850;
         document.body.style.cursor = "default";
         mesh.material.emissive.setHex(mesh.userData.materialEmissiveHex);
         overlay.style.display = "none";
-        
+
         const [lat, lng] = mesh.userData.location as [number, number];
-        
+        overlayContent.innerHTML = `<img src="${fetchStaticMapboxImage(lat, lng)}" />`;
+
         const mesh_position = globe.getCoords(lat, lng, config.zoom_mesh_altitude);
         new TWEEN.Tween(mesh.position).to(mesh_position, 1000).easing(TWEEN.Easing.Quadratic.InOut).start();
-        
-        cameraControls.target.set(mesh_position.x, mesh_position.y, mesh_position.z)
+
+        cameraControls.target.set(mesh_position.x, mesh_position.y, mesh_position.z);
         cameraControls.minDistance = 1;
         const camera_position = globe.getCoords(lat, lng, isMobile ? 0.24 : 0.237);
         new TWEEN.Tween(camera.position)
@@ -220,13 +223,7 @@ start.onclick = (_) => {
           .start()
           .onComplete(() => {
             overlayLoad.style.display = mesh.userData.highRes ? "none" : "block";
-            overlayNext.style.display = objConfig.models > 1 ? "block" : "none";
-            overlay.style.display = "block";
-
-            overlayContent.innerHTML = `
-            <img src="${fetchStaticMapboxImage(lat, lng)}" />
-            ${descriptions[objConfig.id]}
-            `;
+            overlay.style.display = "flex";
           });
       });
 
@@ -267,18 +264,5 @@ start.onclick = (_) => {
   overlayLoad.onclick = (_) => {
     if (!selectedObject) return;
     upgradeMesh(selectedObject);
-  };
-
-  overlayNext.onclick = (_) => {
-    if (!selectedObject) return;
-
-    const nextModel = (selectedObject.userData.model + 1) % selectedObject.userData.models;
-
-    addObject(selectedObject.userData as ObjConfig, nextModel, true).then((mesh) => {
-      if (!selectedObject) return;
-      mesh.rotation.y = selectedObject.rotation.y;
-      scene.remove(selectedObject);
-      selectedObject = mesh;
-    });
   };
 };

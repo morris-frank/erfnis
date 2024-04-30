@@ -8,24 +8,29 @@ fi
 upstream=/Users/mfr/b2/morris-cloud/docs/ethnography/collection/
 downstream=/Users/mfr/b2/morris-museum/
 
-# 1. Generate small images
+# - Generate small images
 for file in $(find "$upstream" -type f -name "*.jpg"); do
     if [[ "$file" == *".small.jpg" ]]; then
         continue
     fi
 
     smallFile="${file%.jpg}.small.jpg"
-    if [ ! -f "$smallFile" ]; then
+    if [ $force == true ] || [ ! -f "$smallFile" ]; then
         echo "Processing $file"
-        convert "$file" -resize 512x512\> -quality 80% "$smallFile"
+        convert "$file" -auto-orient -strip -resize 512x512\> -quality 80% "$smallFile"
     fi
-
 done
 
-# 2. Sync files
-rsync -av --include='*/' --include='*.small.jpg' --include='*.glb' --exclude='*' $upstream $downstream
+# - Generate images.json
+for folder in $(find "$upstream" -type d); do
+    echo "Processing $folder"
+    find "$folder" -type f -name "*.small.jpg" -exec basename {} \; | jq -R . | jq -s . >"$folder/images.json"
+done
 
-# 3. Optimize GLB files
+# - Sync files
+rsync -av --include='*/' --include='*.html' --include='*.json' --include='*.small.jpg' --include='*.glb' --exclude='*' $upstream $downstream
+
+# - Optimize GLB files
 for file in $(find "$downstream" -type f -name "*.glb"); do
     if [[ $file == *"highRes"* ]] || [[ $file == *"lowRes"* ]]; then
         continue
