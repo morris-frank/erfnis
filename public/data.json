@@ -1,16 +1,26 @@
 [
   {
-    "path": "dan/spoon",
-    "models": 2,
+    "id": "42",
+    "models": 1,
     "location": [7.4, -7.55],
-    "rotation": 90,
-    "polycam": true
+    "rotation": -45
   },
   {
-    "path": "fan/spoon",
-    "models": 2,
+    "id": "43",
+    "models": 1,
     "location": [2.4, -7.55],
-    "rotation": 90,
-    "polycam": true
+    "rotation": -45
+  },
+  {
+    "id": "44",
+    "models": 1,
+    "location": [22.4, -7.55],
+    "rotation": -45
+  },
+  {
+    "id": "45",
+    "models": 1,
+    "location": [12.4, -7.55],
+    "rotation": -45
   }
 ]

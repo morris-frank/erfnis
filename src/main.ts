@@ -7,18 +7,17 @@ import data from "../public/data.json";
 import "./style.css";
 
 interface ObjConfig {
-  path: string;
+  id: string;
   models: number;
   location: number[];
   rotation: number;
-  polycam: boolean;
 }
 
 const config = {
   mesh_scale: 5,
   ruler_height: 10, // in cm
   base_mesh_altitude: 0.01,
-  zoom_mesh_altitude: 0.2,
+  zoom_mesh_altitude: 0.18,
   base_camera_altitude: 0.5,
 };
 
@@ -51,6 +50,7 @@ function init() {
   camera.position.set(x, y, z);
 
   const cameraControls = new OrbitControls(camera, canvas);
+  cameraControls.target.set(0, 0, 0);
   cameraControls.enablePan = false;
   cameraControls.rotateSpeed = 0.2;
   cameraControls.maxDistance = 155;
@@ -91,7 +91,11 @@ function fetchStaticMapboxImage(lat: number, lon: number) {
   return `https://api.mapbox.com/styles/v1/${username}/${style_id}/static/${lon},${lat},${zoom}/${width}x${height}@2x/?access_token=${token}`;
 }
 
-let selectedObject: THREE.Object3D | null = null;
+let selectedObject: THREE.Mesh<
+  THREE.BufferGeometry<THREE.NormalBufferAttributes>,
+  THREE.MeshStandardMaterial,
+  THREE.Object3DEventMap
+> | null = null;
 let descriptions: { [key: string]: string } = {};
 const overlay = document.querySelector<HTMLDivElement>("#overlay")!;
 const overlayContent = document.querySelector<HTMLDivElement>("#overlay-content")!;
@@ -103,7 +107,7 @@ const entrance = document.querySelector<HTMLDivElement>("#entrance")!;
 
 start.onclick = (_) => {
   const { renderer, scene, camera, cameraControls, loader, interactionManager, globe } = init();
-  data.map((objConfig) => addObject(objConfig, false, 0, false));
+  data.map((objConfig) => addObject(objConfig, 0, false));
   animate();
   entrance.style.display = "none";
 
@@ -121,17 +125,34 @@ start.onclick = (_) => {
       .start();
   }
 
-  async function addObject(objConfig: ObjConfig, highRes: boolean = false, model: number = 0, zoomed: boolean = false) {
-    fetch(`${BASE_URL}/${objConfig.path}/description.html`).then((response) => {
-      response.text().then((text) => {
-        descriptions[objConfig.path] = text;
-      });
+  async function upgradeMesh(
+    mesh: THREE.Mesh<THREE.BufferGeometry<THREE.NormalBufferAttributes>, THREE.MeshStandardMaterial, THREE.Object3DEventMap>
+  ) {
+    if (mesh.userData.highRes) return;
+
+    loader.loadAsync(`${mesh.userData.path}/highRes.glb`).then((gltf) => {
+      const highResMesh = gltf.scene.children[0] as THREE.Mesh<
+        THREE.BufferGeometry<THREE.NormalBufferAttributes>,
+        THREE.MeshStandardMaterial,
+        THREE.Object3DEventMap
+      >;
+
+      mesh.material = highResMesh.material;
+      mesh.geometry = highResMesh.geometry;
+      mesh.userData.highRes = true;
+      overlayLoad.style.display = "none";
     });
+  }
 
-    const path = `${BASE_URL}/${objConfig.path}/models/${model}/${objConfig.polycam ? "" : "3DModel"}${highRes ? "highRes" : "lowRes"}.glb`;
+  async function addObject(objConfig: ObjConfig, model: number = 0, zoomed: boolean = false) {
+    // fetch(`${BASE_URL}/${objConfig.id}/description.html`).then((response) => {
+    //   response.text().then((text) => {
+    //     descriptions[objConfig.id] = text;
+    //   });
+    // });
 
-    return loader.loadAsync(path).then((gltf) => {
-      const mesh = (objConfig.polycam ? gltf.scene.children[0] : gltf.scene.children[0].children[0]) as THREE.Mesh<
+    return loader.loadAsync(`${BASE_URL}/${objConfig.id}/lowRes.glb`).then((gltf) => {
+      const mesh = gltf.scene.children[0] as THREE.Mesh<
         THREE.BufferGeometry<THREE.NormalBufferAttributes>,
         THREE.MeshStandardMaterial,
         THREE.Object3DEventMap
@@ -139,8 +160,9 @@ start.onclick = (_) => {
 
       scene.add(mesh);
       mesh.userData = objConfig;
-      mesh.userData.highRes = highRes;
       mesh.userData.model = model;
+      mesh.userData.highRes = false;
+      mesh.userData.path = `${BASE_URL}/${objConfig.id}`;
 
       mesh.material = mesh.material.clone();
       mesh.material.emissiveIntensity = 0.5;
@@ -160,15 +182,6 @@ start.onclick = (_) => {
 
       mesh.rotation.y = (Math.PI / 180) * objConfig.rotation;
 
-      if (import.meta.env.DEV) {
-        const box = new THREE.BoxHelper(mesh, 0xffff00);
-        box.update();
-        scene.add(box);
-
-        const dot = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
-        mesh.add(dot);
-      }
-
       mesh.addEventListener("mouseover", (_) => {
         if (selectedObject && selectedObject == mesh) return;
         document.body.style.cursor = "pointer";
@@ -182,6 +195,7 @@ start.onclick = (_) => {
       });
 
       mesh.addEventListener("mousedown", (_) => {
+        console.log(mesh.id, selectedObject?.id);
         if (selectedObject && selectedObject == mesh) return;
         if (selectedObject) unZoomMesh(selectedObject);
 
@@ -190,27 +204,28 @@ start.onclick = (_) => {
         const isMobile = window.innerWidth < 850;
         document.body.style.cursor = "default";
         mesh.material.emissive.setHex(mesh.userData.materialEmissiveHex);
-        cameraControls.enabled = false;
         overlay.style.display = "none";
-
+        
         const [lat, lng] = mesh.userData.location as [number, number];
-
+        
         const mesh_position = globe.getCoords(lat, lng, config.zoom_mesh_altitude);
         new TWEEN.Tween(mesh.position).to(mesh_position, 1000).easing(TWEEN.Easing.Quadratic.InOut).start();
-
-        const camera_position = globe.getCoords(lat, lng, isMobile ? 0.27 : 0.237);
+        
+        cameraControls.target.set(mesh_position.x, mesh_position.y, mesh_position.z)
+        cameraControls.minDistance = 1;
+        const camera_position = globe.getCoords(lat, lng, isMobile ? 0.24 : 0.237);
         new TWEEN.Tween(camera.position)
           .to({ x: camera_position.x, y: isMobile ? camera_position.y - 2 : camera_position.y, z: camera_position.z }, 1000)
           .easing(TWEEN.Easing.Quadratic.InOut)
           .start()
           .onComplete(() => {
-            overlayLoad.style.display = highRes ? "none" : "block";
+            overlayLoad.style.display = mesh.userData.highRes ? "none" : "block";
             overlayNext.style.display = objConfig.models > 1 ? "block" : "none";
             overlay.style.display = "block";
 
             overlayContent.innerHTML = `
             <img src="${fetchStaticMapboxImage(lat, lng)}" />
-            ${descriptions[objConfig.path]}
+            ${descriptions[objConfig.id]}
             `;
           });
       });
@@ -243,21 +258,15 @@ start.onclick = (_) => {
       .easing(TWEEN.Easing.Quadratic.InOut)
       .start()
       .onComplete(() => {
-        cameraControls.enabled = true;
+        cameraControls.target.set(0, 0, 0);
+        cameraControls.minDistance = 105;
         selectedObject = null;
       });
   };
 
   overlayLoad.onclick = (_) => {
     if (!selectedObject) return;
-
-    addObject(selectedObject.userData as ObjConfig, true, selectedObject.userData.model, true).then((mesh) => {
-      if (!selectedObject) return;
-      mesh.rotation.y = selectedObject.rotation.y;
-      scene.remove(selectedObject);
-      selectedObject = mesh;
-      overlayLoad.style.display = "none";
-    });
+    upgradeMesh(selectedObject);
   };
 
   overlayNext.onclick = (_) => {
@@ -265,7 +274,7 @@ start.onclick = (_) => {
 
     const nextModel = (selectedObject.userData.model + 1) % selectedObject.userData.models;
 
-    addObject(selectedObject.userData as ObjConfig, selectedObject.userData.highRes, nextModel, true).then((mesh) => {
+    addObject(selectedObject.userData as ObjConfig, nextModel, true).then((mesh) => {
       if (!selectedObject) return;
       mesh.rotation.y = selectedObject.rotation.y;
       scene.remove(selectedObject);
